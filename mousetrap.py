@@ -186,6 +186,9 @@ def discover_targets() -> list:
         while True:
             host = sock.recv(20).decode('ascii', errors='ignore')[5:]
             ip = socket.gethostbyname(host)
+            if ip in targets:
+                continue
+            
             targets.append(ip)
             _success("Received broadcast from {} ({})".format(ip, host))
     except KeyboardInterrupt:
@@ -196,6 +199,8 @@ def discover_targets() -> list:
 
 
 def main():
+    print(discover_targets())
+    return
     parser = argparse.ArgumentParser()
     parser.add_argument('--os', type=str, action='store', choices=('MacOS', 'Windows'), required=True, help="Signals what OS the target is running")
     parser.add_argument('--cmd', type=str, action='store', required=True, help="Command to execute")

