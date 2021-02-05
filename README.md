@@ -6,7 +6,7 @@ So, like any good story, this one begins with me figuring out how to troll stran
 
 I knew it used some sort of automatic host discovery, because once I installed the server on my desktop, it automatically appeared on my phone. So my first thought was some sort of broadcast advertisement of the server. I popped open Wireshark to inspect the traffic originating from my computer, and after filtering out the obnoxious amount of traffic from YouTube and Discord, I found something sending two UDP packets around 20 times per second:
 
-![Wireshark Discovery](img/wireshark_discovery.png)
+![Wireshark Discovery](imgs/wireshark_discovery.png)
 
 Cool, so it looks like it blasts a hostname with something before it `BC 15DESKTOP-BIICVE8`. I'm not sure what the `BC 15` portion is, it isn't any sort of IP address or anything either. So it looks like the phone's application has to resolve the hostname in order to start communications with it. 
 
@@ -23,7 +23,7 @@ However, this makes it trivial to find our target set since the server is so kin
 
 Finally, I noticed when I clicked the name of a computer in the app, there was some sort of handshake that occured over TCP port 1978 (I wonder if that's the dev's birthday?).
 
-![TCP Handshake](img/tcp_handshake.png)
+![TCP Handshake](imgs/tcp_handshake.png)
 
 Not very interesting, except it looks like it broadcasts the OS in the data, and a few bytes that say "nop", which I find a little odd. However, for hacking, this seems unimportant.
 
@@ -31,7 +31,7 @@ Not very interesting, except it looks like it broadcasts the OS in the data, and
 
 I popped open Wireshark to see traffic coming across the (proverbial) wire, and discovered UDP packets being sent to my computer from my phone. To make a more controlled test, I simply typed 'a' on my phone and saw this packet appear:
 
-!['a' character packet](img/wireshark_character.png)
+!['a' character packet](imgs/wireshark_character.png)
 
 Interesting, looks like a string is sent in plaintext: `key 7[ras]84`. Well at first I checked if 84 was the hex/dec for 'a', but unfortuantely it wasn't...
 
@@ -42,7 +42,7 @@ Interesting, looks like a string is sent in plaintext: `key 7[ras]84`. Well at f
 '0x61'
 ```
 
-Then I I thought perhaps the 84, the "[ras]", or some other portion of the UDP Data field was a [nonce](https://en.wikipedia.org/wiki/Cryptographic_nonce), preventing me from replaying that same packet. To test it, I right-clicked the packet in Wireshark and selected "Copy as hex dump", then threw it into scapy to try and replicate the keystroke:
+Then I I thought perhaps the 84, the "[ras]", or some other portion of the UDP Data field was a [nonce](https://en.wikipedia.org/wiki/Cryptographic_nonce), preventing me from replaying that same packet. To test it, I took the UDP Data field, and threw it into scapy to replicate the keystroke:
 
 ```python
 >>> # The time.sleep exists so I could move my mouse back to a text editor to ensure the keystroke was registered
@@ -59,7 +59,7 @@ The RemoteMouse server gets installed to `C:\Program Files (x86)\Remote Mouse` b
 
 I threw the executable into Ghidra and saw the telltale sign that it was a .NET executable: the entrypoint redirected to `_CorExeMain`.
 
-![Ghidra Entrypoint Decompilation](img/ghidra_entry.png)
+![Ghidra Entrypoint Decompilation](imgs/ghidra_entry.png)
 
 My go-to .NET reversing tool is, and always will be, dnSpy, so I booted it up and started poking around. I landed in a class that seemed to tokenize a string around some substrings that I saw in the original message, namely "[ras]". There is a function inside of `internal class w`, with the signature `public static void a(byte[] A_0, int A_1)`. You can see the function, and my version written in Python (for ease of following) below:
 
@@ -487,8 +487,8 @@ Wait a minute... Is that an MD5 Hash in front of the plain-text single-key packe
 
 Let's do some work in CyberChef real quick:
 
- - [Detect the Hash type](https://gchq.github.io/CyberChef/#recipe=Analyse_hash()&input=YjYwY2Y4YmE3ZTVkYWI0YjNiNmJlZDc4YmRlMWU0NzA)
- - [Hash our password (`PAssword`) with that hash](https://gchq.github.io/CyberChef/#recipe=MD5()&input=UEFzc3dvcmQ)
+ - [Detect the hashing algorithm](https://gchq.github.io/CyberChef/#recipe=Analyse_hash()&input=YjYwY2Y4YmE3ZTVkYWI0YjNiNmJlZDc4YmRlMWU0NzA)
+ - [Hash our password (`PAssword`) with that hashing algorithm](https://gchq.github.io/CyberChef/#recipe=MD5()&input=UEFzc3dvcmQ)
 
 
 Okay, so their idea of encrypting the communications _isn't_ actually encrypted a packet, it's prepending the MD5 hash of the password to the beginning of the packet. Let's make sure this works using scapy:
@@ -499,7 +499,7 @@ Okay, so their idea of encrypting the communications _isn't_ actually encrypted 
 Sent 1 packets.
 ```
 
-Lo and behold, a single 'b' was typed into my computer. I tried changing the hash to see what would happen, but that didn't work unfortunately. So if the traffic is encrypted, all we really have to do is either bruteforce the hash, or sniff out someone else's traffic. And to determine if a server is using a password, we can simply open up a TCP connection with them and see the response:
+Lo and behold, a single 'b' was typed into my computer. I tried changing the hash to see what would happen, but that didn't work unfortunately. So if the traffic is encrypted, all we really have to do is either bruteforce the hash, or sniff out someone else's traffic. And to determine if a server is using a password, we can simply open up a TCP connection with it and see the response:
 
 ```bash
 $ telnet 192.168.86.195 1978
@@ -508,3 +508,5 @@ Connected to 192.168.86.195.
 Escape character is '^]'.
 SIN 15win pwd pwd 300^CConnection closed by foreign host.
 ```
+
+Cool, so the `pwd pwd` substring appears when there is a password, otherwise it's `nop nop`.
