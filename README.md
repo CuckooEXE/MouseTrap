@@ -16,7 +16,7 @@ It's clear that this application is very vulnerable and puts users at risk with 
 
 - Vulnerability #3: Bad Configuration, Broadcasts Service By Default
 
-    By default, the server broadcasts its existence to the entire subnet via UDP broadcasts. This coupled with the lack of a password by default, allows an attacker to automatically discover and send commands without any interaction from them.
+    By default, the server broadcasts its existence to the entire subnet via UDP broadcasts. This coupled with the lack of a password by default, allows an attacker to automatically discover and send commands without any interaction from either the target or the attacker.
 
 - Vulnerability #4: No use of HTTPS for AutoUpdates
   
