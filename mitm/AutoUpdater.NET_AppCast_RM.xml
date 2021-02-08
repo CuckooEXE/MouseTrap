@@ -1,0 +1,7 @@
+<item>
+    <title>New version 3.2.0.0 is available for Remote Mouse</title>
+    <version>3.2.0.0</version>
+    <url>http://www.remotemouse.net/downloads/RemoteMouse.exe</url>
+    <changelog>http://www.remotemouse.net/autoupdater/releasenotes_rm.html</changelog>
+    <mandatory>true</mandatory>
+</item>

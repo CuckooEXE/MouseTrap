@@ -1,8 +1,30 @@
 # Mouse Trap
 
-So, like any good story, this one begins with me figuring out how to troll strangers in a video game. My friend and I were discussing ridiculous methods of playing Rainbow Six Siege, such as playing with our G29 Racing Wheel, when I suggested using one of those Android apps that allowed you to control your mouse and keyboard on your computer, using just your phone. I tried it out, promptly died and lost us the game, and started wondering how it actually worked.
+
+## Vulnerabilities
+
+It's clear that this application is very vulnerable and puts users at risk with bad authentication mechanisms, lack of encryption, and poor default configuration. With 10,000,000+ downloads on the Android App Store _alone_, there are a lot of oblivious users who could be completely owned without ever realizing. Here are the vulnerabilities/weaknesses documented:
+
+- Vulnerability #1: Authentication Bypass Via Packet Replay
+    
+    When the password is set, the password hash and command are sent in cleartext. This allows an attacker to listen to network traffic and copy the hash to send their own commands.
+
+- Vulnerability #2: Bad Configuration, No Password By Default
+
+    No password is set by default, which means anyone can send a command to the server without authenticating first.
+
+- Vulnerability #3: Bad Configuration, Broadcasts Service By Default
+
+    By default, the server broadcasts its existence to the entire subnet via UDP broadcasts. This coupled with the lack of a password by default, allows an attacker to automatically discover and send commands without any interaction from them.
+
+- Vulnerability #4: No use of HTTPS for AutoUpdates
+  
+    The server uses `http://` in the URI scheme to check for, and download, the newest binary. An attacker could host their own malicious binary and force a "mandatory" update on users.
+
 
 ## Discovery
+
+So, like any good story, this one begins with me figuring out how to troll strangers in a video game. My friend and I were discussing ridiculous methods of playing Rainbow Six Siege, such as playing with our G29 Racing Wheel, when I suggested using one of those Android apps that allowed you to control your mouse and keyboard on your computer, using just your phone. I tried it out, promptly died and lost us the game, and started wondering how it actually worked.
 
 I knew it used some sort of automatic host discovery, because once I installed the server on my desktop, it automatically appeared on my phone. So my first thought was some sort of broadcast advertisement of the server. I popped open Wireshark to inspect the traffic originating from my computer, and after filtering out the obnoxious amount of traffic from YouTube and Discord, I found something sending two UDP packets around 20 times per second:
 
@@ -609,6 +631,68 @@ else
 ```
 
 
+Anyway, back to the `if (@string == "cin")` logic, the software splits a packet into a few different chunks. Given the client sending a message, i.e. `cin0361d8be84073da97f62df6123d50d1286e 240`, it gets split up into:
+
+ 1. `cin` - Signifies the client is sending in data
+ 2. `036` - The next three bytes are the ASCII representation of the number of bytes to read next
+ 3. `1d8be84073da97f62df6123d50d1286e` - Some sort of hash
+ 4. `240` - Never actually used
+
+Let's look at the conditional that actually decides the pass/fail if the password is correct: `if (Form_Options.MD5String(this.ReverseD(this.j)) == array3[0] && this.i)`). So it checks `this.i` to make sure encryption is set in the first place, then it takes the hash of the password stored in the registry, and reverses it. Passes the reversed hash into a custom MD5String function:
+
+```C#
+public static string MD5String(string str)
+{
+    byte[] array = MD5.Create().ComputeHash(Encoding.UTF8.GetBytes(str));
+    StringBuilder stringBuilder = new StringBuilder();
+    for (int i = 0; i < array.Length; i++)
+    {
+        stringBuilder.Append(array[i].ToString("x2"));
+    }
+    return stringBuilder.ToString();
+}
+```
+
+This function takes in the reversed MD5 hash, hashes _that_ and then takes those bytes and converts them to ASCII as their hex representation, i.e. byte `0x7F` will turn into `7F`. To simplify this entire process, here's a python snippet:
+
+```python
+import hashlib
+
+pwd = getRegValue(r"Computer\HKEY_CURRENT_USER\SOFTWARE\remotemouse.net\Remote Mouse\3.0.1.5\Password")
+pwd = pwd[::-1] # reverse the string
+pwd = hashlib.md5(pwd.encode()).hexdigest()
+```
+
+And this ends up working when we put it all together to send our own password over:
+
+```python
+import hashlib
+import socket
+import sys
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((sys.argv[1], int(sys.argv[2])))
+
+pwd = input()
+pwd = hashlib.md5(pwd.encode()).hexdigest()
+pwd = pwd[::-1] # reverse the string
+pwd = hashlib.md5(pwd.encode()).hexdigest()
+msg = 'cin036'+pwd+' 240'
+
+print('>', s.recv(1024).decode())
+s.send(msg.encode())
+print('<', msg)
+print('>', s.recv(1024).decode())
+```
+
+```bash
+$ echo '123456' | python3 test/test.py 192.168.86.195 1978
+> SIN 15win pwd pwd 300
+< cin03674ce4a21f159e81638334cbe243cd2cf 240
+> cin  7success
+```
+
+Unfortunately, to date, I don't see how this can be bypassed.
 
 ## AutoUpdate 
 
@@ -726,7 +810,9 @@ server {
 
 ![MessageBox Success](imgs/custombinary.png)
 
-Let's reboot the server again, and... **SUCCESS**! The auto-updater worked and executed a binary that we served! Though, that's a little odd, the nginx server logs don't show any connections. To double-check, I turned off the nginx reverse-proxy, and ran it again, and it worked. This means we can succesfully MITM a target and serve them a malicious, custom exectuable. 
+Let's reboot the server again, and... **SUCCESS**! The auto-updater worked and executed a binary that we served! Though, that's a little odd, the nginx server logs don't show any connections. To double-check, I turned off the nginx reverse-proxy, and ran it again, and it worked. This means we can succesfully MITM a target and serve them a malicious, custom exectuable with **no** HTTPS/TLS concerns.
+
+All the necessary code/files to replicate are stored in `mitm/`.
 
 ## UAC Passthru
 
@@ -734,3 +820,32 @@ I wanted to see if you could pass through and click "Ok" on a UAC pop-up. This i
 
 ## Icons
 
+TODO: The App can pull the Icons from the taskbar as a quick hotbar for the user. These must be transmitted over the wire, so I'd like to see how that works and download them as part of `mousetrap.py`.
+
+## Disclosure
+
+On 02/06/2021 I sent an email to `info@remotemouse.net`:
+
+> RemoteMouse Team,
+>
+>I'm a security researcher that has identified vulnerabilities in your application protocol for RemoteMouse. After analyzing the packets sent from the RemoteMouse Android Application to the Windows RemoteMouse service, I noticed three critical issues:
+>
+>  - CWE-836: Use of Password Hash Instead of Password for Authentication
+> 
+>     The client software sends the hash of the password a user enters to the server in order to authenticate. This can cause the hash of the user's passwords to be intercepted and looked up in a rainbow table, resulting in the user's password being revealed.
+> - CWE-306: Missing Authentication for Critical Function and CWE-319: Cleartext Transmission of Sensitive Information
+> 
+>     Even with a "password" set, the server and client do not encrypt communications, this allows a passive observer to see what activity the user is sending to the server.
+> - CWE-294: Authentication Bypass by Capture-replay
+>
+>     The client and server do not use cryptographic nonces in communications, this allows any passive observer to replay the commands sent, even when the password is set on the server side. 
+>
+> Per standard vulnerability disclosure practices, please respond within 90 days of today (Friday May 7, 2021). If you have any questions on the details of the vulnerabilities, or you would like any assistance, please do not hesitate to reach out to me via email (me@axelp.io).
+>
+> Thank you,
+> Axel Persinger.
+
+
+### Special Thanks
+
+Special thanks to [Matt Matteis](https://www.linkedin.com/in/matthew-matteis-616a33bb/) for reviewing this report and guiding me through the disclosure process.
