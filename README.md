@@ -44,7 +44,7 @@ However, this makes it trivial to find our target set since the server is so kin
 ...     print(host)
 ```
 
-Finally, I noticed when I clicked the name of a computer in the app, there was some sort of handshake that occured over TCP port 1978 (I wonder if that's the dev's birthday?).
+Finally, I noticed when I clicked the name of a computer in the app, there was some sort of handshake that occured over TCP port 1978.
 
 ![TCP Handshake](imgs/tcp_handshake.png)
 
@@ -475,7 +475,9 @@ It looks like in the FAQ for Remote Mouse, they explain that a password can be s
 
 > Click Remote Mouse icon on the taskbar (top right corner on Mac, bottom right corner on PC), choose Settings" -> Set password for your computer -> Apply
 
-When you set a password, during the TCP handshake, the "nop" strings are replaced with a "pwd" strings. Interesting, looks like this is just to signify the app to enter a password. Actually getting the server and app to agree on a password took a lot of work. Every time you reset or set a password, you have to restart the server, and even then it seems like you have to do it a few more times for it to actually work. I set the password to `PAssword` and started inspecting the traffic again.
+Every time you set the password, you have to restart the RemoteMouse server in order for the change to take place. This isn't very obvious, so I feel like the UI should either tell you to restart, it should restart by itself, or it shouldn't have to restart at all, and just update the password logic. Also getting the Android App to connect to a server with a password is very janky, like 80% of the time I tried to connect it would just drop the connection, and I couldn't figure out why.
+
+When you set a password, during the TCP handshake, the "nop" strings are replaced with a "pwd" strings. Interesting, looks like this is just to signify the app to enter a password. I set the password to `PAssword` and started inspecting the traffic again.
 
 So a password handshake looks like this (these are hexdumps of the data field of the TCP packets)
 
@@ -693,7 +695,7 @@ $ echo '123456' | python3 test/test.py 192.168.86.195 1978
 > cin  7success
 ```
 
-Unfortunately, to date, I don't see how this can be bypassed.
+Unfortunately, to date, I don't see how the authentication/password check can be bypassed without first sniffing someone's password out from the air (either via the TCP handshake, or more importantly, via the UDP command packets).
 
 ## AutoUpdate 
 
