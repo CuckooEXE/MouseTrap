@@ -1,5 +1,6 @@
-# Mouse Trap
+# MouseTrap
 
+MouseTrap is a suite of vulernabilities/exploit that targets the RemoteMouse application and server. 
 
 ## Vulnerabilities
 
