@@ -893,6 +893,20 @@ clo006chrome
 
 You can force a process to die without a user every realizing. No mouse movement, no keyboard input, nothing. All of this with NO authentication.
 
+## Buffer Overflow
+
+TODO: See if the logic that receives data from ports (i.e. `clo006chrome`), that dictates buffer-size from user, can be exploited.
+
+## Market Penetration
+
+TODO: Get empirical data on how many servers are running, how many are running on the internet.
+
+Notes:
+    
+  - Shodan lists 32 IPs with port 1978 open
+  - Maybe write a custom masscan protocol analyzer? That'd be cool
+  - Maybe write an Nmap service-probe-file, pipe a simple port-open scann from masscan to that nmap scan
+
 ## Disclosure
 
 On 02/06/2021 I sent an email to `info@remotemouse.net`:
