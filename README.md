@@ -511,7 +511,104 @@ SIN 15win pwd pwd 300^CConnection closed by foreign host.
 
 Cool, so the `pwd pwd` substring appears when there is a password, otherwise it's `nop nop`. But let's see if there's anyway we can get past the authentication. Oddly enough, I'm having a hard time finding the encryption routine in the binary.
 
-Finally after much more searching, I found the logic that handles password-protected sessions. It's contained in `RemoteMouse.exe` in `Form1.b(object)`. The binary checks if `this.i` is set to true, and if so, sends the `pwd pwd 300` string, otherwise it sends the `nop nop 300` string. Let's see how `this.i` is set: 
+Finally after much more searching, I found the logic that handles password-protected sessions. It's contained in `RemoteMouse.exe` in `Form1.b(object)`. The binary checks if `this.i` is set to true, and if so, sends the `pwd pwd 300` string, otherwise it sends the `nop nop 300` string.
+
+Then it captures the three bytes of the next TCP transmission and checks if they equal `cin`. If they do, it uses the NEXT three bytes as the length to pull the next chunk of data, which is finally the hash that is sent over as authentication. The code snippet in question is below:
+
+```C#
+if (@string == "cin")
+{
+    byte[] dataFromSocket = Form1.GetDataFromSocket(tcpClient, 3);
+    if (dataFromSocket == null)
+    {
+        goto Block_7;
+    }
+    int len = Convert.ToInt32(Encoding.ASCII.GetString(dataFromSocket).Trim());
+    byte[] dataFromSocket2 = Form1.GetDataFromSocket(tcpClient, len);
+    if (dataFromSocket2 == null)
+    {
+        goto Block_8;
+    }
+    string[] array3 = Encoding.ASCII.GetString(dataFromSocket2).Split(new char[]
+    {
+        ' '
+    });
+    string text3;
+    if (Form_Options.MD5String(this.ReverseD(this.j)) == array3[0] && this.i)
+    {
+        flag = true;
+        text3 = "cin  7success";
+    }
+    else
+    {
+        flag = false;
+        text3 = "cin  4fail";
+    }
+    byte[] bytes2 = Encoding.ASCII.GetBytes(text3);
+    try
+    {
+        tcpClient.Client.Send(bytes2, bytes2.Length, SocketFlags.None);
+        continue;
+    }
+    catch (Exception)
+    {
+        continue;
+    }
+}
+```
+
+You can see that if the hashes match, it sets the `flag` variable to true, which all the other functions check for before continuing any business logic **except** where the next command chunk is `cur` or `hb1`. The `cur` logic, below, only modifies the `flag2` variable which is later looked at by the `mos` logic.
+
+```C#
+else if (@string == "cur")
+{
+    int num10 = 0;
+    byte[] threeByteData7 = Form1.GetThreeByteData(tcpClient, out num10);
+    if (threeByteData7 == null)
+    {
+        goto Block_34;
+    }
+    flag2 = (Encoding.ASCII.GetString(threeByteData7) == "xl");
+}
+```
+
+
+The `hb1` function seems to just send the characters back to the client? Odd, but not sure what it's used for.
+
+```C#
+else if (@string == "hb1")
+{
+    byte[] bytes3 = Encoding.ASCII.GetBytes("hb1");
+    tcpClient.Client.Send(bytes3);
+}
+```
+
+Let's look more closely at the `cin` logic to see if we can bypass the authentication, the `this.i` signifies that encryption is in fact, set. How is `this.i` determined? It's in the `Form1.g(object, EventArgs)` function, which is the entry-point for the software. If the password exists in the UserAppDataRegistry, then the server is considering itself as encrypted. The UserAppDataRegistry just points to the `CurrentUser\Software\CompanyName\ProductName\ProductVersion` according to the [documentation](https://docs.microsoft.com/en-us/dotnet/api/system.windows.forms.application.userappdataregistry?view=net-5.0). And sure enough, if we check, we see our password (MD5 hash of `123456`).
+
+![Registry](imgs/registry.png)
+
+```C#
+try
+{
+    this.j = Application.UserAppDataRegistry.GetValue("Password").ToString();
+}
+catch
+{
+    this.i = false;
+    this.j = "";
+}
+if (this.j.Trim() == "")
+{
+    this.i = false;
+    this.j = "";
+}
+else
+{
+    this.i = true;
+}
+```
+
+
 
 ## AutoUpdate 
 
@@ -630,3 +727,10 @@ server {
 ![MessageBox Success](imgs/custombinary.png)
 
 Let's reboot the server again, and... **SUCCESS**! The auto-updater worked and executed a binary that we served! Though, that's a little odd, the nginx server logs don't show any connections. To double-check, I turned off the nginx reverse-proxy, and ran it again, and it worked. This means we can succesfully MITM a target and serve them a malicious, custom exectuable. 
+
+## UAC Passthru
+
+I wanted to see if you could pass through and click "Ok" on a UAC pop-up. This isn't anything gamechanging, but I thought it'd be pretty cool to see it work, especially if the malicious binary you served via the AutoUpdate feature requires elevated permissions. It would be hard to demonstrate without me taking a video of my phone and computer at the same time (and that could easily be spoofed), but it does in fact work. Your keyboard and mouse controls still work when the UAC popup happens.
+
+## Icons
+
