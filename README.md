@@ -788,7 +788,7 @@ And rebooted the server to see this:
 
 ![XML V3](imgs/xmlv3.png)
 
-So we can make it pop up with a mandatory update! Let's see if we can succesfully serve the binary, as well. I think the AutoUpdate.Net library might be a little smarter than the RemoteMouse binary, and force an HTTP connection, so let's spin up an Nginx reverse proxy and redirect 443 traffic to 80. I know this won't successfully MITM someone, because of SSL errors (unless the developers explicitly ignore them...), but let's see what happens. Here are two snippets from a [Gist](https://gist.github.com/jessedearing/2351836) to do this quickly:
+So we can make it pop up with a mandatory update! Let's see if we can succesfully serve the binary, as well. I think the AutoUpdate.Net library might be a little smarter than the RemoteMouse binary, and force an HTTPS connection, so let's spin up an Nginx reverse proxy and redirect 443 traffic to 80. I know this won't successfully MITM someone, because of SSL errors (unless the developers explicitly ignore them...), but let's see what happens. Here are two snippets from a [Gist](https://gist.github.com/jessedearing/2351836) to do this quickly:
 
 ```bash
 openssl req -x509 -nodes -days 365 -newkey rsa:1024  -keyout /etc/nginx/ssl/myssl.key  -out /etc/nginx/ssl/myssl.crt
