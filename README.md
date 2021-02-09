@@ -891,7 +891,73 @@ Escape character is '^]'.
 clo006chrome
 ```
 
-You can force a process to die without a user every realizing. No mouse movement, no keyboard input, nothing. All of this with NO authentication.
+You can force a process to die without a user every realizing. No mouse movement, no keyboard input, nothing. All of this with NO authentication. Let's implement these functions in our exploit code.
+
+Let's start with the `act` subroutine. In the code, this is called via the `q.b(socket)`, which turns into a more complicated function:
+
+```C#
+private static void b(Socket A_0)
+{
+    byte[] array = new byte[1295];
+    foreach (Class_AppInfo class_AppInfo in Class_ProgramInfo.apps.Values.ToList<Class_AppInfo>())
+    {
+        if (class_AppInfo.ico != null)
+        {
+            MemoryStream memoryStream = new MemoryStream();
+            class_AppInfo.ico.ToBitmap().Save(memoryStream, ImageFormat.Png);
+            class_AppInfo.icoLength = (ulong)memoryStream.Length;
+            Array.Clear(array, 0, array.Length);
+            MemoryStream memoryStream2 = new MemoryStream();
+            memoryStream2.Write(class_AppInfo.appName, 0, class_AppInfo.appName.Length);
+            memoryStream2.Write(class_AppInfo.appPath, 0, class_AppInfo.appPath.Length);
+            memoryStream2.Write(BitConverter.GetBytes(class_AppInfo.appStatus), 0, 1);
+            memoryStream2.Write(BitConverter.GetBytes(class_AppInfo.apphWnd), 0, 4);
+            memoryStream2.Write(BitConverter.GetBytes(class_AppInfo.intPre2), 0, 4);
+            memoryStream2.Write(BitConverter.GetBytes(class_AppInfo.bPre1), 0, 1);
+            memoryStream2.Write(BitConverter.GetBytes(class_AppInfo.bPre2), 0, 1);
+            memoryStream2.Write(BitConverter.GetBytes(class_AppInfo.icoLength), 0, 4);
+            memoryStream2.Position = 0L;
+            memoryStream2.Read(array, 0, class_AppInfo.appName.Length);
+            memoryStream2.Read(array, 256, class_AppInfo.appPath.Length);
+            memoryStream2.Read(array, 1280, 1);
+            memoryStream2.Read(array, 1281, 4);
+            memoryStream2.Read(array, 1285, 4);
+            memoryStream2.Read(array, 1289, 1);
+            memoryStream2.Read(array, 1290, 1);
+            memoryStream2.Read(array, 1291, 4);
+            memoryStream2.Close();
+            byte[] buffer = new byte[3];
+            buffer = Encoding.UTF8.GetBytes("dok");
+            byte[] buffer2 = new byte[4];
+            buffer2 = BitConverter.GetBytes(array.Length);
+            try
+            {
+                A_0.Send(buffer);
+                A_0.Send(buffer2);
+                A_0.Send(array);
+                A_0.Send(memoryStream.ToArray());
+            }
+            catch (Exception)
+            {
+                A_0.Close();
+                A_0 = null;
+                break;
+            }
+            memoryStream.Close();
+            memoryStream = null;
+        }
+    }
+}
+```
+
+Let's start digesting this... It first it creates an array, size 1295 bytes long, this is will the final payload will be stored. Then itcreates the PNG of the application's icon, stores it into a `memorystream` and calculates the icon's length. Once the icon is dealt with, a separate `memorystream` is created and information is put into it. Finally, information from the second `memorystream` is put into the array that was created earlier. 
+
+Now that all the buffers are created, the following is sent back to the client:
+
+1. `dok` (just a hard-coded string)
+2. Length of the next array
+3. Array containing all the application information
+4. Icon
 
 ## Buffer Overflow
 
