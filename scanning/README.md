@@ -123,9 +123,36 @@ Building a masscan module actually took a little bit of work, and effort (ugh, I
 
 Now, you are no longer encumbered by Nmap's speed hit, you can freely scan the internet using the beauty of masscan.
 
-Because masscan has a `GNU Affero General Public License version 3` license, I think even though I technically don't have to since I'm not re-distributing the source, I'm going to put the patch under that license and explain a few legal aspects:
+
+For anyone looking to extend Masscan here is basically what you have to do:
+
+### Extending Masscan
+
+This is probably super wrong, and will make the masscan developers cringe, but it worked for me:
+
+1. Add a new entry to the `enum ApplicationProtocol` in `masscan-app.h`
+    
+    This is basically the global variable for "Hey I want to be able to plug this into different places"
+2. Create a App->String and String->App mapping in `masscan_app_to_string` and `masscan_string_to_app`.
+
+    This is helps masscan later on translate your protocol to a friendly string for the banners
+3. Include your protocol's header in `proto-banner1.c`
+4. Add a new entry into `struct Patterns patterns[]` in `proto-banner1.c`.
+5. Add a new `case` to the `switch (tcb_state->app_proto)` statement in the `banner1_parse` function.
+6. Call your `parse` function in the aforementioned `case` statement.
+7. Create a new file for your protocol, include a custom `ProtocolParserStream` declaration.
+
+    This is a little more complicated, but you'll want an `init`, `parse`, and `selftest` function declared for the protocol.
+8. Create a parser function.
+
+    Your parser function will handle the logic of actually parsing a banner for information. The `px` parameter contains the banner, and the `length` parameter holds the length of `px`.
+
+
 
 ### Legal Stuff
+
+Because masscan has a `GNU Affero General Public License version 3` license, I think even though I technically don't have to since I'm not re-distributing the source, I'm going to put the patch under that license and explain a few legal aspects:
+
 
 To install masscan, follow the instructions below:
 
