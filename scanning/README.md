@@ -41,3 +41,109 @@ Read from scanning: nmap-remotemouse-probe.
 Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
 Nmap done: 1 IP address (1 host up) scanned in 0.36 seconds
 ```
+
+## Masscan -> Nmap
+
+Before building a protocol analyzer with masscan, let's just scan the internet for port 1978 (convenient that the software doesn't allow you to change the port, so unless you have a Reverse-Proxy, it's static), and pipe those results to Nmap. I'm going to go ahead and build masscan from source, so I can quickly just implement my patch if I ever get around to building a protocol analyzer for the server.  This is all done on a bare-metal cloud-hosted VPS.
+
+```bash
+# Commands from https://github.com/robertdavidgraham/masscan#building
+sudo apt-get --assume-yes install git make gcc
+git clone https://github.com/robertdavidgraham/masscan
+cd masscan
+make -j
+make test
+```
+
+I'm also going to firewall the port that masscan uses so I can grab banners as well: `iptables -A INPUT -p tcp --dport 61000 -j DROP`
+
+
+Then, in order to speed up my scan, I'll create a file that has IP addresses that I know won't return results, this is actually from the first part of the repo's exclude configuration:
+
+```
+# http://tools.ietf.org/html/rfc5735
+# "This" network
+0.0.0.0/8
+# Private networks
+10.0.0.0/8
+# Carrier-grade NAT - RFC 6598
+100.64.0.0/10
+# Host loopback
+127.0.0.0/8
+# Link local
+169.254.0.0/16
+# Private networks
+172.16.0.0/12
+# IETF Protocol Assignments
+192.0.0.0/24
+# DS-Lite
+192.0.0.0/29
+# NAT64
+192.0.0.170/32
+# DNS64
+192.0.0.171/32
+# Documentation (TEST-NET-1)
+192.0.2.0/24
+# 6to4 Relay Anycast
+192.88.99.0/24
+# Private networks
+192.168.0.0/16
+# Benchmarking
+198.18.0.0/15
+# Documentation (TEST-NET-2)
+198.51.100.0/24
+# Documentation (TEST-NET-3)
+203.0.113.0/24
+# Reserved
+240.0.0.0/4
+# Limited Broadcast
+255.255.255.255/32
+```
+
+This results in a pretty simple scan command, I'll save it as a configuration file, and then launch masscan under the screen program so I don't lose my progress.
+
+`./masscan/bin/masscan --ports 1978 --source-port 6100 --excludefile exclude.conf --rate 1000000 -oL scan.txt --banners 0.0.0.0/0 --echo > scan.conf`
+
+For some reason, it kept outputting `nocatpure = servername` into the configuration which produces an error, and wouldn't save the `excludefile = exclude.conf` to the configuration file. I had to make those two changes manually (`sed -i 's/nocapture = servername/excludefile = exclude.conf/' scan.conf`), and we were up and running.
+
+Then in a screen session we can execute the actual scan:
+
+`sudo ./masscan/bin/masscan --conf scan.conf`
+
+Finally, we can parse the output list to an input list for Nmap by getting the fourth field of every line: `cut -d\  -f4 scan.txt > IPs.txt`. Then use Nmap with our custom service scanner:
+
+`sudo nmap -sV -p1978 -iL IPs.txt --versiondb ./scanning/nmap-remotemouse-probe` 
+
+From there you can simply grep your results and start hacking :).
+
+
+## Masscan
+
+Building a masscan module actually took a little bit of work, and effort (ugh, I know, right?). I ended up reading a lot of the `proto-ftp.c` code in order to see how it parsed the FTP protocol, and how it "told" the scanner of its existence. Through that, I was able to create a `proto-remotemouse.c` that parsed the banner from port 1978 and determined the OS (again, technically not sure if that is supposed to be `win` vs `mac`, but I'm going to guess yes for now), and if the service is password protected.
+
+Now, you are no longer encumbered by Nmap's speed hit, you can freely scan the internet using the beauty of masscan.
+
+Because masscan has a `GNU Affero General Public License version 3` license, I think even though I technically don't have to since I'm not re-distributing the source, I'm going to put the patch under that license and explain a few legal aspects:
+
+### Legal Stuff
+
+To install masscan, follow the instructions below:
+
+```bash
+sudo apt-get --assume-yes install git make gcc
+git clone https://github.com/robertdavidgraham/masscan
+cd masscan
+make
+```
+
+To install the patch I created in order to analyze the RemoteMouse protocol, follow the instructions below:
+
+```bash
+
+# From inside the masscan directory
+git apply remote-mouse.patch
+```
+
+The masscan source code can be found here: https://github.com/robertdavidgraham/masscan
+
+The patch is distrubuted under the GNU Affero General Public License version 3 license.
