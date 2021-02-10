@@ -2,4 +2,6 @@ Remote Mouse Ghidra/
 Remote-Mouse/
 .vscode/
 __pycache__/
+targets/
 test/
+masscan/

@@ -2,6 +2,10 @@
 
 MouseTrap is a suite of vulernabilities/exploit that targets the RemoteMouse application and server. 
 
+## Shell
+
+I mainly built the shell, `mousetrap_shell.py` as an exercise to practice making shells. It will also launch if you run `mousetrap.py` with no arguments.
+
 ## Vulnerabilities
 
 It's clear that this application is very vulnerable and puts users at risk with bad authentication mechanisms, lack of encryption, and poor default configuration. With 10,000,000+ downloads on the Android App Store _alone_, there are a lot of oblivious users who could be completely owned without ever realizing. Here are the vulnerabilities/weaknesses documented:
@@ -995,6 +999,9 @@ icon_len 280
 icon b'\x89PNG'
 ```
 
+Nice! The server actually streams all the data to you, one at a time, so I just set a 0.5 second timeout on the socket and continuously read the data into a `dict` to store everything, then I dumped it out into a `manifest.json` and `PNG` files. To use this, just run `python3 mousetrap.py --dump-apps`.
+
+Let's implement the rest of the functions that are exposed on this service (`opn`, `clo`, `min`, `max`). `clo` is actually insanely easy, you just send the command followed by how many bytes the name of the process is, and the process that you want to close. This was demonstrated above, and is implemented with `--close-process chrome.exe`, or whatever process you want.
 
 ## Buffer Overflow
 
@@ -1002,13 +1009,16 @@ TODO: See if the logic that receives data from ports (i.e. `clo006chrome`), that
 
 ## Market Penetration
 
-TODO: Get empirical data on how many servers are running, how many are running on the internet.
+I started to get curious on how many servers there were out there. The Android play store reports "10,000,000+" downloads of the app, and that probably wouldn't be a 1:1 correlation to a server, plus people eventually uninstall the server from their computer. All of that, _plus_ to even target a remote host they have to be routable to `TCP/UDP` 1978/1979. But it would still be cool to scan the internet real quick and see who is out there. Luckily for us, the service on port 1978 broadcasts a banner.
 
-Notes:
-    
-  - Shodan lists 32 IPs with port 1978 open
-  - Maybe write a custom masscan protocol analyzer? That'd be cool
-  - Maybe write an Nmap service-probe-file, pipe a simple port-open scann from masscan to that nmap scan
+At first, I was writing an Nmap script to scan a subnet, and match the banner, but I don't think Nmap would be particularly good at scanning the entire internet. In fact, that's why [massscan](https://github.com/robertdavidgraham/masscan) was invented. However, looking at masscan, it's kind of hard to build a custom protocol analyzer, so instead, let's write an Nmap service script first.
+
+Writing an Nmap service/banner match is actually pretty straight-forward given their [guide](https://nmap.org/book/vscan-fileformat.html). The documented probe file is in the `scanning/` dir, as well as some example usage.
+
+So right now, we could use masscan to see all open 1978 ports on TCP, then pipe that to Nmap to do the actual service scanning. That's probably insanely fast, and faster than I'll ever need, but I want _faster_. 
+
+Let's take a look again at writing a masscan protocol analyzer...
+
 
 ## Disclosure
 

