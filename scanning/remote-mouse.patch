@@ -53,7 +53,7 @@ index 08f8b83..f53914d 100644
      {"\x83\x00\x00\x01\x8f", 5, PROTO_SMB, SMACK_ANCHOR_BEGIN, 0}, /* Unspecified error */
  
      /* ...the remainder can be in any order */
-+    {"SIN 15*** *** *** 300", 21, PROTO_REMOTEMOUSE, SMACK_ANCHOR_BEGIN | SMACK_WILDCARDS, 0},
++    {"SIN 15win *** *** 300", 21, PROTO_REMOTEMOUSE, SMACK_ANCHOR_BEGIN | SMACK_WILDCARDS, 0},
      {"SSH-1.",      6, PROTO_SSH1, SMACK_ANCHOR_BEGIN, 0},
      {"SSH-2.",      6, PROTO_SSH2, SMACK_ANCHOR_BEGIN, 0},
      {"HTTP/1.",     7, PROTO_HTTP, SMACK_ANCHOR_BEGIN, 0},
@@ -73,3 +73,87 @@ index 08f8b83..f53914d 100644
      case PROTO_SSL3:
          banner_ssl.parse(
                          banner1,
+diff --git a/src/proto-remotemouse.c b/src/proto-remotemouse.c
+new file mode 100644
+index 0000000..3de0d8a
+--- /dev/null
++++ b/src/proto-remotemouse.c
+@@ -0,0 +1,60 @@
++#include "proto-remotemouse.h"
++
++
++/***************************************************************************
++ ***************************************************************************/
++static void
++remotemouse_parse(  const struct Banner1 *banner1,
++          void *banner1_private,
++          struct ProtocolState *pstate,
++          const unsigned char *px, size_t length,
++          struct BannerOutput *banout,
++          struct InteractiveData *more)
++{
++    banout_append(banout, PROTO_REMOTEMOUSE, px, length);
++
++    // Determine OS
++    if(strncmp((char*)(px+6), "win", 3) == 0) {
++        banout_append(banout, PROTO_REMOTEMOUSE_OS, "Windows", 7);
++    } else if (strncmp((char*)(px+6), "mac", 3) == 0) {
++        banout_append(banout, PROTO_REMOTEMOUSE_OS, "MacOS", 5);
++    } else {
++        banout_append(banout, PROTO_REMOTEMOUSE_OS, "UNKNOWN", 7);
++    }
++
++    // Determine Password Protected
++    if(strncmp((char*)(px+10), "pwd pwd", 7) == 0) {
++        banout_append(banout, PROTO_REMOTEMOUSE_PASSWORD_PROTECTED, "TRUE", 4);
++    } else if (strncmp((char*)(px+10), "nop nop", 7) == 0) {
++        banout_append(banout, PROTO_REMOTEMOUSE_PASSWORD_PROTECTED, "FALSE", 5);
++    } else {
++        banout_append(banout, PROTO_REMOTEMOUSE_PASSWORD_PROTECTED, "UNKNOWN", 7);
++    }
++}
++
++/***************************************************************************
++ ***************************************************************************/
++static void *
++remotemouse_init(struct Banner1 *banner1)
++{
++    UNUSEDPARM(banner1);
++    return 0;
++}
++
++
++/***************************************************************************
++ ***************************************************************************/
++static int
++remotemouse_selftest(void)
++{
++    return 0;
++}
++
++/***************************************************************************
++ ***************************************************************************/
++const struct ProtocolParserStream banner_remotemouse = {
++    "remotemouse", 1978, 0, 0, 0,
++    remotemouse_selftest,
++    remotemouse_init,
++    remotemouse_parse,
++};
+\ No newline at end of file
+diff --git a/src/proto-remotemouse.h b/src/proto-remotemouse.h
+new file mode 100644
+index 0000000..366f112
+--- /dev/null
++++ b/src/proto-remotemouse.h
+@@ -0,0 +1,11 @@
++#ifndef PROTO_REMOTEMOUSE_H
++#define PROTO_REMOTEMOUSE_H
++#include "proto-banner1.h"
++#include "unusedparm.h"
++#include "masscan-app.h"
++#include <ctype.h>
++#include <string.h>
++
++extern const struct ProtocolParserStream banner_remotemouse;
++
++#endif
