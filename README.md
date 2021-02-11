@@ -1017,7 +1017,25 @@ Writing an Nmap service/banner match is actually pretty straight-forward given t
 
 So right now, we could use masscan to see all open 1978 ports on TCP, then pipe that to Nmap to do the actual service scanning. That's probably insanely fast, and faster than I'll ever need, but I want _faster_. 
 
-Let's take a look again at writing a masscan protocol analyzer...
+Let's take a look again at writing a masscan protocol analyzer... I wrote some more detailed documentation in the `scanning/` dir, but the tl;dr is that I wrote a protocol analyzer for masscan that can tell if:
+
+- a computer is running RemoteMouse
+- a computer is running a password-protected version of RemoteMouse
+- a computer is MacOS or Windows
+
+To run it (after building the patched version of masscan, again docs in `scanning/`):
+
+```bash
+$ sudo ./bin/masscan --banners --adapter-port 61000 --ports 1978 192.168.86.195                                  
+Starting masscan 1.3.2 (http://bit.ly/14GZzcT) at 2021-02-11 01:52:01 GMT
+Initiating SYN Stealth Scan
+Scanning 1 hosts [1 port/host]
+Discovered open port 1978/tcp on 192.168.86.195                                
+Banner on port 1978/tcp on 192.168.86.195: [remotemouse] SIN 15win nop nop 300 
+Banner on port 1978/tcp on 192.168.86.195: [remotemouse.password_protected] FALSE
+Banner on port 1978/tcp on 192.168.86.195: [remotemouse.os] Windows            
+
+```
 
 
 ## Disclosure

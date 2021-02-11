@@ -58,47 +58,7 @@ make test
 I'm also going to firewall the port that masscan uses so I can grab banners as well: `iptables -A INPUT -p tcp --dport 61000 -j DROP`
 
 
-Then, in order to speed up my scan, I'll create a file that has IP addresses that I know won't return results, this is actually from the first part of the repo's exclude configuration:
-
-```
-# http://tools.ietf.org/html/rfc5735
-# "This" network
-0.0.0.0/8
-# Private networks
-10.0.0.0/8
-# Carrier-grade NAT - RFC 6598
-100.64.0.0/10
-# Host loopback
-127.0.0.0/8
-# Link local
-169.254.0.0/16
-# Private networks
-172.16.0.0/12
-# IETF Protocol Assignments
-192.0.0.0/24
-# DS-Lite
-192.0.0.0/29
-# NAT64
-192.0.0.170/32
-# DNS64
-192.0.0.171/32
-# Documentation (TEST-NET-1)
-192.0.2.0/24
-# 6to4 Relay Anycast
-192.88.99.0/24
-# Private networks
-192.168.0.0/16
-# Benchmarking
-198.18.0.0/15
-# Documentation (TEST-NET-2)
-198.51.100.0/24
-# Documentation (TEST-NET-3)
-203.0.113.0/24
-# Reserved
-240.0.0.0/4
-# Limited Broadcast
-255.255.255.255/32
-```
+Then, in order to speed up my scan, I'll create a file that has IP addresses that I know won't return results, this is actually from the first part of the repo's exclude configuration, called `exclude.conf`.
 
 This results in a pretty simple scan command, I'll save it as a configuration file, and then launch masscan under the screen program so I don't lose my progress.
 
