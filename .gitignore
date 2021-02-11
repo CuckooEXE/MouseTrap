@@ -5,3 +5,8 @@ __pycache__/
 targets/
 test/
 masscan/
+analysis/targets.txt
+analysis/scan.txt
+.ipynb_checkpoints
+analysis/token.txt
+
