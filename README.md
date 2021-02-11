@@ -26,6 +26,13 @@ It's clear that this application is very vulnerable and puts users at risk with 
   
     The server uses `http://` in the URI scheme to check for, and download, the newest binary. An attacker could host their own malicious binary and force a "mandatory" update on users.
 
+- Vulnerability #5: Information Disclosure of Applications
+
+    The server discloses various apps, such as recently used, and running, applications to anyone who queries the service on port 1979. This information is not encrypted, and is not protected by a password.
+
+- Vulnerability #6: Unauthenticated Process Termination
+
+    The server allows anyone to terminate any running process by name by sending a specially-crafted command to port 1979. This action does not require authentication, and is not protected by a password.
 
 ## Discovery
 
