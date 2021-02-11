@@ -1066,3 +1066,5 @@ On 02/06/2021 I sent an email to `info@remotemouse.net`:
 ### Special Thanks
 
 Special thanks to [Matt Matteis](https://www.linkedin.com/in/matthew-matteis-616a33bb/) for reviewing this report and guiding me through the disclosure process.
+
+Another special thanks to [Kieran London](https://github.com/kieranlondon), without him I would have never figured out a bug in my mapping of the targets in the Analysis section.
