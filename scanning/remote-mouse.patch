@@ -38,7 +38,7 @@ index fb4a441..0bc1469 100644
      PROTO_end_of_list /* must be last one */
  };
 diff --git a/src/proto-banner1.c b/src/proto-banner1.c
-index 08f8b83..f53914d 100644
+index 08f8b83..a8bfb9d 100644
 --- a/src/proto-banner1.c
 +++ b/src/proto-banner1.c
 @@ -17,6 +17,7 @@
@@ -53,7 +53,7 @@ index 08f8b83..f53914d 100644
      {"\x83\x00\x00\x01\x8f", 5, PROTO_SMB, SMACK_ANCHOR_BEGIN, 0}, /* Unspecified error */
  
      /* ...the remainder can be in any order */
-+    {"SIN 15win *** *** 300", 21, PROTO_REMOTEMOUSE, SMACK_ANCHOR_BEGIN | SMACK_WILDCARDS, 0},
++    {"SIN 15*** *** *** 300", 21, PROTO_REMOTEMOUSE, SMACK_ANCHOR_BEGIN | SMACK_WILDCARDS, 0},
      {"SSH-1.",      6, PROTO_SSH1, SMACK_ANCHOR_BEGIN, 0},
      {"SSH-2.",      6, PROTO_SSH2, SMACK_ANCHOR_BEGIN, 0},
      {"HTTP/1.",     7, PROTO_HTTP, SMACK_ANCHOR_BEGIN, 0},
