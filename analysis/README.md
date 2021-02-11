@@ -13,6 +13,8 @@ json - Json library
 requests - HTTP library
 matplotlib.pyplot (plt) - Matplotlib Plotting library
 numpy (np) - Mathematics library
+cartopy.crs (crs) - Python mapping library
+pytz - Convert country abbreviation to full names
 """
 import re
 import json
@@ -21,6 +23,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import cartopy.crs as ccrs
+import pytz
 ```
 
 
@@ -33,7 +36,7 @@ _masscan_output - Masscan Grepable output contents
 _targets - Target file contents
 """
 with open('token.txt') as f:
-    _token = f.read()
+    _token = f.read().strip('\n')
 with open('targets.txt') as f:
     _masscan_output = f.read()
 ```
@@ -115,14 +118,22 @@ def countries_pieplot(hosts: dict):
     values = [
         sum(1 if hosts[host]['country'] == country else 0 for host in hosts) for country in labels
     ]
+    labels = set(str(pytz.country_names.get(label, label)) for label in labels) # Rename the labels to full country names
     fig, ax = plt.subplots()
     fig.set_figheight(7)
     fig.set_figwidth(7)
-    ax.pie(values, labels=labels, autopct='%1.1f%%')
+    wedges, texts, autotexts = ax.pie(values, autopct='%1.1f%%')
+    ax.legend(wedges, labels,
+          title="Countries",
+          loc="center left",
+          bbox_to_anchor=(1, 0, 0.5, 1))
     ax.axis('equal')
+    ax.set_title("Target by Country")
+
+    
     plt.show()
 
-countries_pieplot(hosts)
+countries_pieplot(_targets)
 ```
 
 
@@ -219,7 +230,7 @@ def target_map(hosts: dict):
     ax.stock_img()
     
     for host in hosts:
-        coords = [float(i) for i in hosts[host]['loc'].split(',')]
+        coords = [float(i) for i in hosts[host]['loc'].split(',')][::-1]
         color = 'red' if hosts[host]['password'] else 'blue'
         plt.plot(*coords, color=color, linewidth=2, marker='o', transform=ccrs.PlateCarree())
     
@@ -231,7 +242,7 @@ def target_map(hosts: dict):
 
     plt.show()
 
-target_map(hosts)
+target_map(_targets)
 ```
 
 
