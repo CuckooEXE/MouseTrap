@@ -11,6 +11,6 @@ ports 1978
 # Match the Windows banner
 match remotemouse m/SIN 15win nop nop 300/ p/RemoteMouse/ o/Windows/
 match remotemouse m/SIN 15win pwd pwd 300/ p/RemoteMouse/ o/Windows/ i/Password Protected/
-# Match the Mac banner (note: I actually don't know if that's right, I just guess the win is replaced with mac)
-match remotemouse m/SIN 15mac nop nop 300/ p/RemoteMouse/ o/Mac OS/
-match remotemouse m/SIN 15mac pwd pwd 300/ p/RemoteMouse/ o/Mac OS/ i/Password Protected/
+# Match the Mac banner
+match remotemouse m/SIN 15osx nop nop 300/ p/RemoteMouse/ o/Mac OS/
+match remotemouse m/SIN 15osx pwd pwd 300/ p/RemoteMouse/ o/Mac OS/ i/Password Protected/

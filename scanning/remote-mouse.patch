@@ -97,7 +97,7 @@ index 0000000..3de0d8a
 +    // Determine OS
 +    if(strncmp((char*)(px+6), "win", 3) == 0) {
 +        banout_append(banout, PROTO_REMOTEMOUSE_OS, "Windows", 7);
-+    } else if (strncmp((char*)(px+6), "mac", 3) == 0) {
++    } else if (strncmp((char*)(px+6), "osx", 3) == 0) {
 +        banout_append(banout, PROTO_REMOTEMOUSE_OS, "MacOS", 5);
 +    } else {
 +        banout_append(banout, PROTO_REMOTEMOUSE_OS, "UNKNOWN", 7);

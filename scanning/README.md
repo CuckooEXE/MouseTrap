@@ -79,7 +79,7 @@ From there you can simply grep your results and start hacking :).
 
 ## Masscan
 
-Building a masscan module actually took a little bit of work, and effort (ugh, I know, right?). I ended up reading a lot of the `proto-ftp.c` code in order to see how it parsed the FTP protocol, and how it "told" the scanner of its existence. Through that, I was able to create a `proto-remotemouse.c` that parsed the banner from port 1978 and determined the OS (again, technically not sure if that is supposed to be `win` vs `mac`, but I'm going to guess yes for now), and if the service is password protected.
+Building a masscan module actually took a little bit of work, and effort (ugh, I know, right?). I ended up reading a lot of the `proto-ftp.c` code in order to see how it parsed the FTP protocol, and how it "told" the scanner of its existence. Through that, I was able to create a `proto-remotemouse.c` that parsed the banner from port 1978 and determined the OS, and if the service is password protected.
 
 Now, you are no longer encumbered by Nmap's speed hit, you can freely scan the internet using the beauty of masscan.
 
