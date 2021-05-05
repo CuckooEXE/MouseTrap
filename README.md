@@ -1,38 +1,18 @@
 # MouseTrap
 
-MouseTrap is a suite of vulernabilities/exploit that targets the RemoteMouse application and server. 
-
-## Shell
-
-I mainly built the shell, `mousetrap_shell.py` as an exercise to practice making shells. It will also launch if you run `mousetrap.py` with no arguments.
+MouseTrap is a suite of vulernabilities/exploit that targets the RemoteMouse application and server. As of release date 05/06/2021, the vulnerabilities have not been patched.
 
 ## Vulnerabilities
 
 It's clear that this application is very vulnerable and puts users at risk with bad authentication mechanisms, lack of encryption, and poor default configuration. With 10,000,000+ downloads on the Android App Store _alone_, there are a lot of oblivious users who could be completely owned without ever realizing. Here are the vulnerabilities/weaknesses documented:
 
-- Vulnerability #1: Authentication Bypass Via Packet Replay
-    
-    When the password is set, the password hash and command are sent in cleartext. This allows an attacker to listen to network traffic and copy the hash to send their own commands.
+- **CVE-2021-27569**: An issue was discovered in Emote Remote Mouse through 3.015. Attackers can maximize or minimize the window of a running process by sending the process name in a crafted packet. This information is sent in cleartext and is not protected by any authentication logic.
+- **CVE-2021-27570**: An issue was discovered in Emote Remote Mouse through 3.015. Attackers can close any running process by sending the process name in a specially crafted packet. This information is sent in cleartext and is not protected by any authentication logic.
+- **CVE-2021-27571**: An issue was discovered in Emote Remote Mouse through 3.015. Attackers can retrieve recently used and running applications, their icons, and their file paths. This information is sent in cleartext and is not protected by any authentication logic.
+- **CVE-2021-27572**: An issue was discovered in Emote Remote Mouse through 3.015. Authentication Bypass can occur via Packet Replay. Remote unauthenticated users can execute arbitrary code via crafted UDP packets even when passwords are set.
+- **CVE-2021-27573**: An issue was discovered in Emote Remote Mouse through 3.015. Remote unauthenticated users can execute arbitrary code via crafted UDP packets with no prior authorization or authentication.
+- **CVE-2021-27574**: An issue was discovered in Emote Remote Mouse through 3.015. It uses cleartext HTTP to check, and request, updates. Thus, attackers can machine-in-the-middle a victim to download a malicious binary in place of the real update, with no SSL errors or warnings.
 
-- Vulnerability #2: Bad Configuration, No Password By Default
-
-    No password is set by default, which means anyone can send a command to the server without authenticating first.
-
-- Vulnerability #3: Bad Configuration, Broadcasts Service By Default
-
-    By default, the server broadcasts its existence to the entire subnet via UDP broadcasts. This coupled with the lack of a password by default, allows an attacker to automatically discover and send commands without any interaction from either the target or the attacker.
-
-- Vulnerability #4: No use of HTTPS for AutoUpdates
-  
-    The server uses `http://` in the URI scheme to check for, and download, the newest binary. An attacker could host their own malicious binary and force a "mandatory" update on users.
-
-- Vulnerability #5: Information Disclosure of Applications
-
-    The server discloses various apps, such as recently used, and running, applications to anyone who queries the service on port 1979. This information is not encrypted, and is not protected by a password.
-
-- Vulnerability #6: Unauthenticated Process Termination
-
-    The server allows anyone to terminate any running process by name by sending a specially-crafted command to port 1979. This action does not require authentication, and is not protected by a password.
 
 ## Discovery
 
@@ -1010,10 +990,6 @@ Nice! The server actually streams all the data to you, one at a time, so I just 
 
 Let's implement the rest of the functions that are exposed on this service (`opn`, `clo`, `min`, `max`). `clo` is actually insanely easy, you just send the command followed by how many bytes the name of the process is, and the process that you want to close. This was demonstrated above, and is implemented with `--close-process chrome.exe`, or whatever process you want.
 
-## Buffer Overflow
-
-TODO: See if the logic that receives data from ports (i.e. `clo006chrome`), that dictates buffer-size from user, can be exploited.
-
 ## Market Penetration
 
 I started to get curious on how many servers there were out there. The Android play store reports "10,000,000+" downloads of the app, and that probably wouldn't be a 1:1 correlation to a server, plus people eventually uninstall the server from their computer. All of that, _plus_ to even target a remote host they have to be routable to `TCP/UDP` 1978/1979. But it would still be cool to scan the internet real quick and see who is out there. Luckily for us, the service on port 1978 broadcasts a banner.
@@ -1068,6 +1044,8 @@ On 02/06/2021 I sent an email to `info@remotemouse.net`:
 > Thank you,
 >
 >  Axel Persinger.
+
+I never received a response from the vendor. I have also reached out to Microsoft, Apple, and Google (Android Play Store) to see if they would remove the application, or warn users about it, but never heard a response from them either. On 05/05/2021 the details of the vulnerability, the exploit code, and this writeup will go public, albeit a few days early. 
 
 
 ### Special Thanks
