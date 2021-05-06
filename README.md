@@ -2,6 +2,8 @@
 
 MouseTrap is a suite of vulernabilities/exploit that targets the RemoteMouse application and server. As of release date 05/06/2021, the vulnerabilities have not been patched.
 
+<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/1ceS8T2Xack" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
 ## Vulnerabilities
 
 It's clear that this application is very vulnerable and puts users at risk with bad authentication mechanisms, lack of encryption, and poor default configuration. With 10,000,000+ downloads on the Android App Store _alone_, there are a lot of oblivious users who could be completely owned without ever realizing. Here are the vulnerabilities/weaknesses documented:
