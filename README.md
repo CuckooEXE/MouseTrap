@@ -2,7 +2,8 @@
 
 MouseTrap is a suite of vulernabilities/exploit that targets the RemoteMouse application and server. As of release date 05/06/2021, the vulnerabilities have not been patched.
 
-<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/1ceS8T2Xack" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+[![MouseTrap](https://img.youtube.com/vi/1ceS8T2Xack/0.jpg)](https://www.youtube.com/watch?v=1ceS8T2Xack "MouseTrap")
+
 
 ## Vulnerabilities
 
