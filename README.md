@@ -18,7 +18,7 @@ It's clear that this application is very vulnerable and puts users at risk with 
 
 ## Writeup
 
-Please refer to my [blog](https://axelp.io/MouseTrap/) for the full writeup.
+Please refer to my [blog](https://axelp.io/MouseTrap) for the full writeup.
 
 ## Special Thanks
 
